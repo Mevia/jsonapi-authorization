@@ -5,13 +5,15 @@ RSpec.describe 'Tricky operations', type: :request do
   fixtures :all
 
   let(:article) { Article.all.sample }
-  let(:policy_scope) { Article.none }
+  let(:article_policy_scope) { Article.none }
+  let(:comments_policy_scope) { Comment.none }
 
   subject { last_response }
   let(:json_data) { JSON.parse(last_response.body)["data"] }
 
   before do
-    allow_any_instance_of(ArticlePolicy::Scope).to receive(:resolve).and_return(policy_scope)
+    allow_any_instance_of(ArticlePolicy::Scope).to receive(:resolve).and_return(article_policy_scope)
+    allow_any_instance_of(CommentPolicy::Scope).to receive(:resolve).and_return(comments_policy_scope)
   end
 
   before do
@@ -46,20 +48,20 @@ RSpec.describe 'Tricky operations', type: :request do
     end
 
     context 'authorized for create_resource on Comment and newly associated article' do
-      let(:policy_scope) { Article.where(id: article.id) }
+      let(:article_policy_scope) { Article.where(id: article.id) }
       before { allow_operation('create_resource', source_class: Comment, related_records_with_context: related_records_with_context) }
 
       it { is_expected.to be_successful }
     end
 
     context 'unauthorized for create_resource on Comment and newly associated article' do
-      let(:policy_scope) { Article.where(id: article.id) }
+      let(:article_policy_scope) { Article.where(id: article.id) }
       before { disallow_operation('create_resource', source_class: Comment, related_records_with_context: related_records_with_context) }
 
       it { is_expected.to be_forbidden }
 
       context 'which is out of scope' do
-        let(:policy_scope) { Article.none }
+        let(:article_policy_scope) { Article.none }
 
         it { is_expected.to be_not_found }
       end
@@ -78,9 +80,6 @@ RSpec.describe 'Tricky operations', type: :request do
       }]
     end
     let(:comments_policy_scope) { Comment.all }
-    before do
-      allow_any_instance_of(CommentPolicy::Scope).to receive(:resolve).and_return(comments_policy_scope)
-    end
 
     let(:json) do
       <<-EOS.strip_heredoc
@@ -103,14 +102,14 @@ RSpec.describe 'Tricky operations', type: :request do
     subject(:last_response) { post("/articles", json) }
 
     context 'authorized for create_resource on Article and newly associated comments' do
-      let(:policy_scope) { Article.where(id: "new-article-id") }
+      let(:article_policy_scope) { Article.where(id: "new-article-id") }
       before { allow_operation('create_resource', source_class: Article, related_records_with_context: related_records_with_context) }
 
       it { is_expected.to be_successful }
     end
 
     context 'unauthorized for create_resource on Article and newly associated comments' do
-      let(:policy_scope) { Article.where(id: "new-article-id") }
+      let(:article_policy_scope) { Article.where(id: "new-article-id") }
       before { disallow_operation('create_resource', source_class: Article, related_records_with_context: related_records_with_context) }
 
       it { is_expected.to be_forbidden }
@@ -146,20 +145,20 @@ RSpec.describe 'Tricky operations', type: :request do
     end
 
     context 'authorized for create_resource on Tag and newly associated article' do
-      let(:policy_scope) { Article.where(id: article.id) }
+      let(:article_policy_scope) { Article.where(id: article.id) }
       before { allow_operation('create_resource', source_class: Tag, related_records_with_context: related_records_with_context) }
 
       it { is_expected.to be_successful }
     end
 
     context 'unauthorized for create_resource on Tag and newly associated article' do
-      let(:policy_scope) { Article.where(id: article.id) }
+      let(:article_policy_scope) { Article.where(id: article.id) }
       before { disallow_operation('create_resource', source_class: Tag, related_records_with_context: related_records_with_context) }
 
       it { is_expected.to be_forbidden }
 
       context 'which is out of scope' do
-        let(:policy_scope) { Article.none }
+        let(:article_policy_scope) { Article.none }
 
         it { is_expected.to be_not_found }
       end
@@ -177,7 +176,7 @@ RSpec.describe 'Tricky operations', type: :request do
         records: new_comments
       }]
     end
-    let(:policy_scope) { Article.where(id: article.id) }
+    let(:article_policy_scope) { Article.where(id: article.id) }
     let(:comments_policy_scope) { Comment.all }
     before do
       allow_any_instance_of(CommentPolicy::Scope).to receive(:resolve).and_return(comments_policy_scope)
@@ -244,7 +243,7 @@ RSpec.describe 'Tricky operations', type: :request do
       }
       EOS
     end
-    let(:policy_scope) { Article.all }
+    let(:article_policy_scope) { Article.all }
     subject(:last_response) { patch("/articles/#{article.external_id}", json) }
 
     before do

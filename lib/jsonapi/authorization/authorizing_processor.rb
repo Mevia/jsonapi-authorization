@@ -62,17 +62,17 @@ module JSONAPI
       end
 
       def authorize_show_relationship
-        parent_resource = @resource_klass.find_by_key(
+        parent_resource = resource_klass.find_by_key(
           params[:parent_key],
           context: context
         )
 
-        relationship = @resource_klass._relationship(params[:relationship_type].to_sym)
+        relationship = resource_klass._relationship(params[:relationship_type].to_sym)
 
         related_resource =
           case relationship
           when JSONAPI::Relationship::ToOne
-            resources_from_relationship(source_klass, source_id, relationship.type, context).first
+            resource_from_relationship(resource_klass, parent_resource, params[:relationship_type].to_sym, context)
           when JSONAPI::Relationship::ToMany
             # Do nothing — already covered by policy scopes
           else
@@ -81,6 +81,7 @@ module JSONAPI
 
         parent_record = parent_resource._model
         related_record = related_resource._model unless related_resource.nil?
+
         authorizer.show_relationship(source_record: parent_record, related_record: related_record)
       end
 
@@ -91,9 +92,7 @@ module JSONAPI
 
         source_resource = source_klass.find_by_key(source_id, context: context)
 
-        related_resource = resources_from_relationship(
-          source_klass, source_id, relationship_type, context
-        ).first
+        related_resource = resource_from_relationship(source_klass, source_resource, relationship_type, context)
 
         source_record = source_resource._model
         related_record = related_resource._model unless related_resource.nil?
@@ -248,21 +247,15 @@ module JSONAPI
       def authorize_replace_polymorphic_to_one_relationship
         return authorize_remove_to_one_relationship if params[:key_value].nil?
 
-        source_resource = @resource_klass.find_by_key(
+        source_resource = resource_klass.find_by_key(
           params[:resource_id],
           context: context
         )
         source_record = source_resource._model
 
-        # Fetch the name of the new class based on the incoming polymorphic
-        # "type" value. This will fail if there is no associated resource for the
-        # incoming "type" value so this shouldn't leak constants
-        related_record_class_name = source_resource
-          .send(:_model_class_name, params[:key_type])
+        related_resource_klass = resource_klass.resource_klass_for(params[:key_type].to_s.camelize)
 
         # Fetch the underlying Resource class for the new record to-be-associated
-        related_resource_klass = @resource_klass.resource_for(related_record_class_name)
-
         new_related_resource = related_resource_klass
           .find_by_key(
             params[:key_value],
@@ -284,14 +277,14 @@ module JSONAPI
         @authorizer ||= ::JSONAPI::Authorization.configuration.authorizer.new(context: context)
       end
 
-      def resources_from_relationship(source_klass, source_id, relationship_type, context)
+      def resource_from_relationship(source_klass, source_resource, relationship_type, context)
         rid = source_klass.find_related_fragments(
-          [JSONAPI::ResourceIdentity.new(source_klass, source_id)],
+          [source_resource],
           relationship_type,
           context: context
         ).keys.first
 
-        rid.resource_klass.find_to_populate_by_keys(rid.id)
+        rid.resource_klass.find_to_populate_by_keys(rid.id).first
       end
 
       # TODO: Communicate with upstream to fix this nasty hack
@@ -325,7 +318,7 @@ module JSONAPI
               when nil
                 nil
               when Hash # polymorphic relationship
-                resource_class = @resource_klass.resource_for(assoc_value[:type].to_s)
+                resource_class = resource_klass.resource_klass_for(assoc_value[:type].to_s)
                 resource_class.find_by_key(assoc_value[:id], context: context)._model
               when Array
                 resource_class = resource_class_for_relationship(assoc_name)

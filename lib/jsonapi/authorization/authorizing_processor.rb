@@ -36,13 +36,14 @@ module JSONAPI
       def authorize_include_directive
         return if result.is_a?(::JSONAPI::ErrorsOperationResult)
         resources = Array.wrap(
-          if result.respond_to?(:resources)
+          if result.respond_to?(:resource_set)
+            result.resource_set.resource_klasses.values.flat_map(&:values).map { |x| x[:resource] }
+          elsif result.respond_to?(:resources)
             result.resources
           elsif result.respond_to?(:resource)
             result.resource
           end
         )
-
         resources.each do |resource|
           authorize_model_includes(resource._model)
         end

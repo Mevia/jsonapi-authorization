@@ -44,7 +44,9 @@ RSpec.describe 'including resources alongside normal operations', type: :request
           )
         }
 
-        it { is_expected.to be_forbidden }
+        it {
+          is_expected.to be_forbidden
+        }
       end
 
       context 'authorized for include_has_many_resource for Comment' do
